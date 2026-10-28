@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Чистые комнаты — Counter-Fly</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#121212;--panel:#1c1c1c;--panel2:#242424;--line:#2e2e2e;--text:#eaeaea;--mute:#8d8d8d;--accent:#ff5500;--ok:#32d36b;--bad:#ff4d4d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,sans-serif}
+h1,h2,h3,.brand,button{font-family:"Chakra Petch",Inter,sans-serif}
+header{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar{max-width:1000px;margin:auto;padding:12px 16px;display:flex;align-items:center;gap:12px}
+.brand{font-size:22px;font-weight:700;letter-spacing:.5px}.brand b{color:var(--accent)}
+.sp{flex:1}
+button{cursor:pointer;border:0;border-radius:4px;padding:10px 16px;font-size:15px;font-weight:600;background:var(--accent);color:#fff}
+button:hover{filter:brightness(1.1)}button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+button.small{padding:6px 12px;font-size:13px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{max-width:1000px;margin:auto;padding:24px 16px 60px;display:grid;grid-template-columns:1fr 300px;gap:24px}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+h1{font-size:30px;margin:0 0 4px}.lead{color:var(--mute);margin:0 0 20px}
+.room{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:4px;padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.room .info{flex:1;min-width:160px}.room .host{font-weight:600}.room .meta{color:var(--mute);font-size:13px}
+.code{font:600 22px "Chakra Petch",monospace;letter-spacing:2px;background:var(--bg);border:1px dashed var(--line);padding:6px 12px;border-radius:4px}
+.tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 8px;font-size:12px;margin-right:6px}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:4px;padding:28px;text-align:center;color:var(--mute)}
+aside .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px;margin-bottom:16px}
+aside h3{margin:0 0 10px;font-size:18px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:10px;font:inherit}
+.avatar{width:56px;height:56px;border-radius:50%;background:var(--accent);display:grid;place-items:center;font:700 26px "Chakra Petch";margin-bottom:8px}
+.pid{font-family:"Chakra Petch",monospace;color:var(--accent)}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:20px;width:min(380px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+.tabs{display:flex;gap:6px;margin-bottom:6px}.tabs button{flex:1}.tabs button.off{background:var(--panel2);color:var(--mute)}
+.note{font-size:12px;color:var(--mute);margin-top:10px}
+.demo{background:#3a2a00;color:#ffcf66;text-align:center;font-size:13px;padding:6px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ok);color:#000;padding:10px 18px;border-radius:4px;font-weight:600;opacity:0;transition:.25s;pointer-events:none}
+#toast.on{opacity:1;transform:translateX(-50%)}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="demoBar" class="demo" hidden>Демо-режим: данные хранятся только в этом браузере. Чтобы комнаты видели все, подключи Firebase (см. README).</div>
+<header><div class="bar">
+  <div class="brand">COUNTER<b>ROOMS</b></div><div class="sp"></div>
+  <span id="who"></span>
+  <button id="authBtn">Войти</button>
+</div></header>
+
+<main>
+  <section>
+    <h1>Комнаты без читеров</h1>
+    <p class="lead">Игроки сами создают комнаты в Counter-Fly. Выбери комнату, скопируй код и заходи в игру.</p>
+    <div id="rooms"></div>
+  </section>
+  <aside>
+    <div class="card" id="profile" hidden></div>
+    <div class="card" id="create">
+      <h3>Добавить комнату</h3>
+      <p class="mute" style="color:var(--mute);margin:0">Сначала создай комнату в игре, потом впиши её код сюда.</p>
+      <label for="code">Код комнаты</label><input id="code" maxlength="20" autocomplete="off">
+      <label for="mode">Режим</label>
+      <select id="mode"><option>Соревновательный</option><option>Обычный</option><option>Дуэль</option><option>Тренировка</option></select>
+      <label for="note">Описание (необязательно)</label><input id="note" maxlength="60" placeholder="Например: без читов, 5 на 5">
+      <div style="margin-top:14px"><button id="addBtn" style="width:100%">Создать комнату</button></div>
+      <div class="err" id="addErr"></div>
+    </div>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <div class="tabs"><button id="tabIn" type="button">Вход</button><button id="tabUp" type="button" class="off">Регистрация</button></div>
+  <label for="email">Почта</label><input id="email" type="email" autocomplete="email">
+  <label for="nick" id="nickL" hidden>Ник</label><input id="nick" maxlength="16" autocomplete="nickname" hidden>
+  <label for="pass">Пароль</label><input id="pass" type="password" autocomplete="current-password">
+  <div class="err" id="authErr"></div>
+  <div style="display:flex;gap:8px;margin-top:6px"><button id="go" style="flex:1">Войти</button><button id="close" class="ghost" type="button">Закрыть</button></div>
+  <p class="note">Мы храним только почту, ник и ID профиля.</p>
+</dialog>
+<div id="toast"></div>
+
+<script type="module">
+/* ====== НАСТРОЙКА FIREBASE ======
+   Вставь сюда свои данные из Firebase (Project settings → Your apps → Web).
+   Пока apiKey пустой — сайт работает в демо-режиме (данные только в твоём браузере). */
+const FB = { apiKey:"", authDomain:"", projectId:"", appId:"" };
+const ROOM_TTL = 3*60*60*1000; // комната пропадает из списка через 3 часа
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const demo = !FB.apiKey;
+let user = null, rooms = [], authCb = ()=>{}, roomsCb = ()=>{};
+const newId = () => Math.random().toString(36).slice(2,10).toUpperCase();
+
+/* ---------- Backend ---------- */
+let be;
+if (demo) {
+  const get = (k,d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d } catch { return d } };
+  const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+  be = {
+    init(){ authCb(get('cr_session',null)); roomsCb(get('cr_rooms',[])); addEventListener('storage',()=>roomsCb(get('cr_rooms',[]))); },
+    async signUp(email,pass,nick){
+      const u = get('cr_users',{}); if (u[email]) throw {code:'auth/email-already-in-use'};
+      const me = {uid:newId(),email,nick,id:newId()}; u[email]={pass,me}; set('cr_users',u); set('cr_session',me); authCb(me);
+    },
+    async signIn(email,pass){
+      const u = get('cr_users',{})[email]; if (!u || u.pass!==pass) throw {code:'auth/invalid-credential'};
+      set('cr_session',u.me); authCb(u.me);
+    },
+    async signOut(){ localStorage.removeItem('cr_session'); authCb(null); },
+    async addRoom(r){ const a=get('cr_rooms',[]); a.unshift({...r,id:newId()}); set('cr_rooms',a); roomsCb(a); },
+    async delRoom(id){ const a=get('cr_rooms',[]).filter(r=>r.id!==id); set('cr_rooms',a); roomsCb(a); }
+  };
+} else {
+  const v='10.12.2', base=`https://www.gstatic.com/firebasejs/${v}/firebase-`;
+  const [A,Au,F] = await Promise.all([import(base+'app.js'),import(base+'auth.js'),import(base+'firestore.js')]);
+  const app=A.initializeApp(FB), auth=Au.getAuth(app), db=F.getFirestore(app);
+  let busy=false;
+  be = {
+    init(){
+      Au.onAuthStateChanged(auth, async u=>{
+        if (busy) return;
+        if (!u) return authCb(null);
+        const s = await F.getDoc(F.doc(db,'users',u.uid)); const d = s.data()||{};
+        authCb({uid:u.uid,email:u.email,nick:d.nick||'игрок',id:d.id||u.uid.slice(0,8).toUpperCase()});
+      });
+      F.onSnapshot(F.query(F.collection(db,'rooms'),F.orderBy('createdAt','desc')),
+        s=>roomsCb(s.docs.map(d=>({...d.data(),id:d.id}))));
+    },
+    async signUp(email,pass,nick){
+      busy=true;
+      try{
+        const c = await Au.createUserWithEmailAndPassword(auth,email,pass);
+        const id = newId();
+        await F.setDoc(F.doc(db,'users',c.user.uid),{nick,id,email});
+        busy=false; authCb({uid:c.user.uid,email,nick,id});
+      } finally { busy=false }
+    },
+    async signIn(email,pass){ await Au.signInWithEmailAndPassword(auth,email,pass) },
+    async signOut(){ await Au.signOut(auth) },
+    async addRoom(r){ await F.addDoc(F.collection(db,'rooms'),r) },
+    async delRoom(id){ await F.deleteDoc(F.doc(db,'rooms',id)) }
+  };
+}
+
+/* ---------- UI ---------- */
+const toast = t => { const e=$('toast'); e.textContent=t; e.classList.add('on'); setTimeout(()=>e.classList.remove('on'),1800) };
+const ago = ts => { const m=Math.max(0,Math.round((Date.now()-ts)/60000)); return m<1?'только что':m<60?m+' мин назад':Math.floor(m/60)+' ч назад' };
+
+function renderRooms(){
+  const live = rooms.filter(r=>Date.now()-r.createdAt<ROOM_TTL).sort((a,b)=>b.createdAt-a.createdAt);
+  $('rooms').innerHTML = live.length ? live.map(r=>`
+    <div class="room">
+      <div class="code">${esc(r.code)}</div>
+      <div class="info">
+        <div class="host">${esc(r.hostNick)}</div>
+        <div class="meta"><span class="tag">${esc(r.mode)}</span>${esc(r.note||'')} · ${ago(r.createdAt)}</div>
+      </div>
+      <button class="small" data-copy="${esc(r.code)}">Копировать код</button>
+      ${user&&user.uid===r.uid?`<button class="small ghost" data-del="${esc(r.id)}">Удалить</button>`:''}
+    </div>`).join('')
+    : '<div class="empty">Пока нет открытых комнат. Создай первую: сделай комнату в игре и добавь её код справа.</div>';
+}
+function renderUser(){
+  $('who').textContent = user ? user.nick : '';
+  $('authBtn').textContent = user ? 'Выйти' : 'Войти';
+  $('profile').hidden = !user;
+  if (user) $('profile').innerHTML = `<div class="avatar">${esc(user.nick[0].toUpperCase())}</div>
+    <h3 style="margin:0">${esc(user.nick)}</h3>
+    <div class="meta" style="color:var(--mute)">${esc(user.email)}</div>
+    <div style="margin-top:8px">ID профиля: <span class="pid">${esc(user.id)}</span></div>`;
+  renderRooms();
+}
+authCb = u => { user=u; renderUser() };
+roomsCb = r => { rooms=r; renderRooms() };
+
+document.addEventListener('click', async e=>{
+  const c=e.target.closest('[data-copy]'), d=e.target.closest('[data-del]');
+  if (c){ try{ await navigator.clipboard.writeText(c.dataset.copy); toast('Код скопирован') }catch{ prompt('Скопируй код:',c.dataset.copy) } }
+  if (d){ try{ await be.delRoom(d.dataset.del) }catch{ toast('Не удалось удалить') } }
+});
+
+/* auth dialog */
+let signup=false;
+const setMode = s => { signup=s; $('tabIn').classList.toggle('off',s); $('tabUp').classList.toggle('off',!s);
+  $('nick').hidden=$('nickL').hidden=!s; $('go').textContent=s?'Создать аккаунт':'Войти'; $('authErr').textContent='';
+  $('pass').autocomplete=s?'new-password':'current-password' };
+$('tabIn').onclick=()=>setMode(false); $('tabUp').onclick=()=>setMode(true);
+$('close').onclick=()=>$('dlg').close();
+$('authBtn').onclick=()=> user ? be.signOut() : ($('dlg').showModal(), setMode(false));
+const errs={'auth/email-already-in-use':'Эта почта уже зарегистрирована.','auth/invalid-credential':'Неверная почта или пароль.',
+  'auth/invalid-email':'Некорректная почта.','auth/weak-password':'Пароль слишком короткий (минимум 6 символов).'};
+$('go').onclick=async()=>{
+  const email=$('email').value.trim().toLowerCase(), pass=$('pass').value, nick=$('nick').value.trim();
+  $('authErr').textContent='';
+  if(!/^\S+@\S+\.\S+$/.test(email)) return $('authErr').textContent=errs['auth/invalid-email'];
+  if(pass.length<6) return $('authErr').textContent=errs['auth/weak-password'];
+  if(signup && nick.length<2) return $('authErr').textContent='Введи ник (минимум 2 символа).';
+  try{ signup ? await be.signUp(email,pass,nick) : await be.signIn(email,pass); $('dlg').close(); $('pass').value='' }
+  catch(x){ $('authErr').textContent = errs[x.code] || 'Ошибка: попробуй ещё раз.' }
+};
+
+/* add room */
+$('addBtn').onclick=async()=>{
+  $('addErr').textContent='';
+  if(!user){ $('dlg').showModal(); return setMode(false) }
+  const code=$('code').value.trim();
+  if(!code) return $('addErr').textContent='Введи код комнаты.';
+  try{
+    await be.addRoom({code,mode:$('mode').value,note:$('note').value.trim(),uid:user.uid,hostNick:user.nick,createdAt:Date.now()});
+    $('code').value=''; $('note').value=''; toast('Комната добавлена');
+  }catch{ $('addErr').textContent='Не удалось добавить комнату.' }
+};
+
+$('demoBar').hidden=!demo;
+setInterval(renderRooms,60000);
+be.init();
+</script>
+</body>
+</html>
